@@ -8,7 +8,7 @@ import pandas as pd
 PHASE_COLORS = {
     "rollout": "#4C72B0",
     "update": "#DD8452",
-    "idle": "#B0B0B0",
+    "overhead": "#B0B0B0",
 }
 
 

@@ -24,7 +24,7 @@ class MemoryPoller:
     def __init__(self, interval_s: float = 0.05, device: int = 0):
         self.interval_s = interval_s
         self.device = device
-        self._phase = "idle"
+        self._phase = "overhead"
         self._phase_lock = threading.Lock()
         self._samples = []
         self._stop = threading.Event()
