@@ -84,4 +84,4 @@ Then copy `results/verl_trace.csv` into the repo and open `notebooks/02_verl_pha
 
 ## Citation
 
-If useful, cite this repo and the papers above. See `CITATION.cff` (add if needed) or just link back to this README.
+If useful, cite this repo and the papers above.
