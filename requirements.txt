@@ -1,6 +1,7 @@
 torch>=2.1
 transformers>=4.40
-trl>=0.9
+trl>=0.19
+datasets
 pandas
 matplotlib
 pynvml

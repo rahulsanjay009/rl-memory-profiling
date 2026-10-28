@@ -29,13 +29,13 @@ Both phases can be memory-dominant, but at different times within the same step.
 
 **Two tracks, in order of increasing fidelity to the target systems:**
 
-- **Track A — TRL `PPOTrainer`:** pure `transformers` + `trl`, no `vllm`/`ray` dependency. Runs on a single consumer GPU (≥16GB) or even CPU at toy scale. Use this to get the harness working end-to-end cheaply before touching veRL.
+- **Track A — TRL `GRPOTrainer`:** pure `transformers` + `trl`, no `vllm`/`ray` dependency. TRL's classic `PPOTrainer` has moved to an experimental namespace with a much heavier setup (separate reward + value models); `GRPOTrainer` is TRL's current primary on-policy trainer and only needs a reward function and a prompt dataset. Runs on a single consumer GPU (≥16GB) or Colab's free T4. Use this to get the harness working end-to-end cheaply before touching veRL.
 - **Track B — veRL (HybridFlow):** run veRL's official single-GPU PPO/GRPO quickstart (Qwen2.5-0.5B on GSM8K). This is the actual framework named in the related work, so its memory behavior is the one worth publishing. Needs ~24GB VRAM with small batch sizes; if local hardware doesn't fit, a single rented A100/H100 (RunPod, Lambda, Vast.ai — a few dollars for a few hours) is enough.
 
 ## Instrumentation & metrics
 
 - **Coarse timeline:** background thread polling `torch.cuda.memory_allocated()` / `memory_reserved()` every 50–100ms, written to CSV with wall-clock timestamps.
-- **Phase tagging:** wrap the known call sites (`actor.generate_sequences(...)` for rollout, `actor.update_policy(...)` for update in veRL; `ppo_trainer.generate(...)` / `ppo_trainer.step(...)` in TRL) with a context manager that logs phase-start/phase-end timestamps, so the memory CSV can be labeled rollout vs. update after the fact.
+- **Phase tagging:** wrap the known call sites with a context manager that logs phase-start/phase-end timestamps, so the memory CSV can be labeled rollout vs. update after the fact — `actor.generate_sequences(...)` for rollout / `actor.update_policy(...)` for update in veRL; `GRPOTrainer._generate_and_score_completions(...)` for rollout / `GRPOTrainer.training_step(...)` for update in TRL.
 - **Category breakdown:** direct introspection of live tensors (`compute_category_breakdown` in `scripts/memory_poller.py`) — sums parameter, gradient, and optimizer-state tensor bytes at a given checkpoint. More robust for a public repo than parsing the CUDA caching allocator's internal snapshot format, which needs heuristics to attribute blocks to categories. For a deeper dive including allocator fragmentation, record a snapshot with `torch.cuda.memory._record_memory_history(enabled=True)` + `torch.cuda.memory._dump_snapshot()` and inspect it with PyTorch's [memory_viz](https://pytorch.org/memory_viz) tool.
 - **Independent cross-check:** `nvidia-smi --query-gpu=memory.used --format=csv -l 1` (or `nvidia-smi dmon`) logged in parallel, since it measures from outside the PyTorch allocator and will catch anything the allocator hides (fragmentation, CUDA context overhead, vLLM's own memory pool in Track B).
 - **Optional, for a polished figure:** `nsys profile` with `torch.cuda.nvtx.range_push("rollout")` / `range_push("update")` markers around the same call sites, to get an annotated kernel-level timeline.
@@ -68,7 +68,7 @@ rl-memory-profiling/
 
 ## How to run
 
-**Track A (TRL):** open `notebooks/01_trl_baseline_profile.ipynb` directly in Colab (badge above) — it installs dependencies, runs PPO on Qwen2.5-0.5B-Instruct, and renders the phase-memory plot, category breakdown, and idle-time numbers inline. No local GPU needed.
+**Track A (TRL):** open `notebooks/01_trl_baseline_profile.ipynb` directly in Colab (badge above) — it installs dependencies, runs GRPO on Qwen2.5-0.5B-Instruct, and renders the phase-memory plot, category breakdown, and idle-time numbers inline. Needs a GPU runtime (Runtime → Change runtime type → GPU); the free T4 is enough.
 
 **Track B (veRL):** veRL's Ray/vLLM orchestration doesn't run cleanly inside a hosted notebook, so run it on a GPU box (local or rented — RunPod/Lambda/Vast.ai) via the script, then analyze the resulting trace in a notebook:
 
